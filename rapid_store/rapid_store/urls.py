@@ -4,6 +4,8 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -16,4 +18,4 @@ urlpatterns = [
     path('api/notifications/', include('notifications.urls')),
     path('api/loyalty/', include('loyalty.urls')),
     path('api/inventory/', include('inventory.urls')),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
