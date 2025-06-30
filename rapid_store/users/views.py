@@ -1,3 +1,5 @@
+# users/views.py
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -11,27 +13,36 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
+    # Añade los datos personalizados al token si es necesario (ya lo haces en tokens.py)
     return {
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
 
 class RegisterView(APIView):
+    permission_classes = [permissions.AllowAny] # Permitir a cualquiera registrarse
+
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
             token = get_tokens_for_user(user)
-            return Response({'token': token}, status=status.HTTP_201_CREATED)
+            user_data = UserSerializer(user).data
+            # Devuelve tanto el token como los datos del usuario
+            return Response({'token': token, 'user': user_data}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class LoginView(APIView):
+    permission_classes = [permissions.AllowAny] # Permitir a cualquiera intentar iniciar sesión
+
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.validated_data
             token = get_tokens_for_user(user)
-            return Response({'token': token})
+            user_data = UserSerializer(user).data
+            # Devuelve tanto el token como los datos del usuario
+            return Response({'token': token, 'user': user_data})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ProfileView(APIView):
