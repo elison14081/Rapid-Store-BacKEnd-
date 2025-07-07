@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
+from .serializers import RegisterSerializer, UserSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import CustomTokenObtainPairSerializer
 
@@ -30,19 +30,6 @@ class RegisterView(APIView):
             user_data = UserSerializer(user).data
             # Devuelve tanto el token como los datos del usuario
             return Response({'token': token, 'user': user_data}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class LoginView(APIView):
-    permission_classes = [permissions.AllowAny] # Permitir a cualquiera intentar iniciar sesión
-
-    def post(self, request):
-        serializer = LoginSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.validated_data
-            token = get_tokens_for_user(user)
-            user_data = UserSerializer(user).data
-            # Devuelve tanto el token como los datos del usuario
-            return Response({'token': token, 'user': user_data})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ProfileView(APIView):

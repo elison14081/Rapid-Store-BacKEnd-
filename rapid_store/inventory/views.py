@@ -19,7 +19,6 @@ class InventoryLogCreateView(generics.CreateAPIView):
     permission_classes = [permissions.IsAdminUser]
 
     def perform_create(self, serializer):
-        log = serializer.save()
-        item = log.inventory_item
-        item.quantity += log.change
-        item.save()
+        # La lógica de actualización de cantidad se ha eliminado.
+        # La señal 'post_save' en models.py se encargará automáticamente.
+        serializer.save()

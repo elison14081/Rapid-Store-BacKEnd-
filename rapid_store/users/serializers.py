@@ -27,15 +27,6 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         return CustomUser.objects.create_user(**validated_data)
 
-class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField()
-
-    def validate(self, data):
-        user = authenticate(email=data['email'], password=data['password'])
-        if user and user.is_active:
-            return user
-        raise serializers.ValidationError("Credenciales inválidas")
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:

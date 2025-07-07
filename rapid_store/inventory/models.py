@@ -32,6 +32,3 @@ def update_inventory_quantity_on_delete(sender, instance, **kwargs):
     inventory_item = instance.inventory_item
     inventory_item.quantity -= instance.change
     inventory_item.save()
-
-def ready(self):
-    import inventory.models  # Esto asegura que las señales se carguen
