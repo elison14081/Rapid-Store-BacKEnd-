@@ -1,58 +1,83 @@
+# orders/serializers.py
+
+from django.db import transaction
 from rest_framework import serializers
 from .models import Order, OrderItem
-from users.serializers import UserSerializer  # Para mostrar info del usuario
+from users.serializers import UserSerializer
+from products.models import Product
+from products.serializers import ProductSerializer
 
 class OrderItemSerializer(serializers.ModelSerializer):
     """
-    Serializador para los artículos de un pedido.
-    Solo necesita recibir el ID del producto y la cantidad.
+    Serializador para los artículos individuales dentro de un pedido.
     """
+    product = ProductSerializer(read_only=True)
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(), source='product', write_only=True
+    )
+
     class Meta:
         model = OrderItem
-        fields = ['product', 'quantity', 'unit_price', 'total_price']
-        # Los precios se calculan automáticamente en el modelo,
-        # por lo que son de solo lectura en la API.
-        read_only_fields = ['unit_price', 'total_price']
+        fields = ['product_id', 'product', 'quantity', 'unit_price', 'total_price']
+        read_only_fields = ['product', 'unit_price', 'total_price']
 
 
 class OrderSerializer(serializers.ModelSerializer):
     """
-    Serializador para crear y listar pedidos.
-    Maneja la creación de la orden y sus artículos anidados.
+    Serializador principal para crear y ver pedidos.
     """
-    # Usamos el serializador de items para mostrar los detalles
     items = OrderItemSerializer(many=True)
-    # Mostramos los datos del usuario en la respuesta (solo lectura)
     user = UserSerializer(read_only=True)
-
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
     class Meta:
         model = Order
-        # Usamos 'user' y 'total' para que coincida con el modelo corregido
-        fields = ['id', 'user', 'created_at', 'total', 'items']
-        # Estos campos se asignan automáticamente o son propiedades
-        read_only_fields = ['user', 'created_at', 'total']
+        fields = ['id', 'user', 'created_at', 'status', 'status_display', 'total', 'items']
+        read_only_fields = ['id', 'user', 'created_at', 'total', 'status_display']
 
+    def validate_items(self, items_data):
+        """
+        Valida que haya artículos y que haya suficiente stock para cada uno
+        antes de intentar crear el pedido.
+        """
+        if not items_data:
+            raise serializers.ValidationError("El pedido debe tener al menos un artículo.")
+
+        for item_data in items_data:
+            product = item_data['product']
+            quantity = item_data['quantity']
+            
+            # --- CORRECCIÓN APLICADA AQUÍ ---
+            # Se accede al stock a través de la relación 'inventory' definida en los modelos.
+            # Por ejemplo: product.inventory.quantity
+            if product.inventory.quantity < quantity:
+                raise serializers.ValidationError(
+                    f"Stock insuficiente para '{product.name}'. "
+                    f"Disponible: {product.inventory.quantity}, solicitado: {quantity}."
+                )
+        return items_data
+
+    @transaction.atomic
     def create(self, validated_data):
         """
-        Crea un nuevo pedido y sus artículos correspondientes.
+        Crea la orden y sus artículos correspondientes dentro de una transacción
+        atómica para garantizar la integridad de los datos.
         """
-        # Extraemos los datos de los artículos del payload
         items_data = validated_data.pop('items')
-
-        # Obtenemos el usuario autenticado desde el contexto de la vista
         user = self.context['request'].user
+        
+        # 1. Se crea la orden principal
+        order = Order.objects.create(user=user, **validated_data)
 
-        # Creamos el pedido y lo asociamos al usuario
-        order = Order.objects.create(user=user)
-
-        # Creamos cada artículo del pedido
+        # 2. Se crean los artículos del pedido
         for item_data in items_data:
             OrderItem.objects.create(
                 order=order,
                 product=item_data['product'],
                 quantity=item_data['quantity']
             )
-            # No es necesario calcular precios aquí. El modelo OrderItem lo hace solo.
+        
+        # 3. Las señales 'post_save' que definimos en models.py se dispararán
+        #    automáticamente aquí para actualizar el inventario.
 
-        # No es necesario guardar el total. La propiedad @property lo calcula.
         return order
